@@ -39,17 +39,9 @@ async function updateRepo(): Promise<void> {
   await copyFile(`${repoDir}/local-packages.files.tar.zst`, filesLink);
 }
 
-async function hasCommand(command: string): Promise<boolean> {
-  try {
-    await $`command -v ${command}`.quiet();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
-async function runSudo(command: string, args: string[]): Promise<void> {
-  const proc = Bun.spawn(["sudo", command, ...args], {
+async function runPamac(args: string[]): Promise<void> {
+  const proc = Bun.spawn(["pamac", ...args], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",
@@ -98,28 +90,19 @@ async function main() {
         await updateRepo();
       }
 
-      const usePamac = await hasCommand("pamac");
-
       const packagesToInstall = Array.from(new Set([...updatedPackages, ...missingPackages]));
 
-      if (usePamac) {
-        // Run system update (inherit terminal for proper formatting)
-        await log("Running system update via pamac...");
-        await runSudo("pamac", ["update", ...args]);
+      // Run system update via pamac
+      await log("Running system update via pamac...");
+      await runPamac(["update", ...args]);
 
-        if (packagesToInstall.length > 0) {
-          const installArgs = ["install", ...packagesToInstall];
-          if (args.includes("--no-confirm")) {
-            installArgs.push("--no-confirm");
-          }
-          await log("Installing updated local packages...");
-          await runSudo("pamac", installArgs);
+      if (packagesToInstall.length > 0) {
+        const installArgs = ["install", ...packagesToInstall];
+        if (args.includes("--no-confirm")) {
+          installArgs.push("--no-confirm");
         }
-      } else {
-        const pacmanArgs = args.map((arg) => (arg === "--no-confirm" ? "--noconfirm" : arg));
-        await log("Running system update via pacman...");
-        const updateArgs = ["-Syu", ...pacmanArgs, "--needed", ...packagesToInstall];
-        await runSudo("pacman", updateArgs);
+        await log("Installing updated local packages...");
+        await runPamac(installArgs);
       }
       break;
     }
@@ -161,12 +144,12 @@ async function main() {
 Local Packages - Automated package builder for Manjaro
 
 Usage:
-  bun run update [pamac args]  - Build all packages and run pamac update
+  bun run update [args]        - Build all packages and run pamac update
   bun run build <package>      - Build a specific package
   bun run check [packages...]  - Check for available updates
 
 Examples:
-  bun run update               - Update all packages and system
+  bun run update               - Update all packages and system (via pamac)
   bun run update --no-confirm  - Update without confirmation
   bun run build cursor-bin     - Build only cursor-bin
   bun run check                - Check all packages for updates
