@@ -1,0 +1,32 @@
+# Based on AUR tableplus by Lucas Saliés Brum <sistematico at gmail dot com>
+# Auto-generated from template - do not edit directly
+
+pkgname=tableplus
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc='Modern, native, and friendly GUI tool for relational databases (Alpha)'
+arch=('x86_64')
+url='https://tableplus.com/'
+license=('custom')
+depends=('gtksourceview3' 'libgee' 'gnome-keyring')
+source=("tableplus_${pkgver}_amd64.deb::https://deb.tableplus.com/debian/24/pool/main/t/tableplus/tableplus_${pkgver}_amd64.deb"
+        'LICENSE'
+        'tableplus.desktop')
+sha256sums=('%%SHA256%%'
+            'SKIP'
+            'SKIP')
+
+prepare() {
+    tar -xf "${srcdir}/data.tar.zst"
+}
+
+package() {
+    install -d $pkgdir/opt/tableplus $pkgdir/usr/local/bin
+    install -Dm755 $srcdir/opt/tableplus/tableplus -t $pkgdir/opt/tableplus/
+    install -m755 $srcdir/opt/tableplus/tableplus -t $pkgdir/opt/tableplus/
+    install -Dm644 $srcdir/tableplus.desktop -t $pkgdir/usr/share/applications/
+    install -Dm644 $srcdir/LICENSE $pkgdir/usr/share/licenses/$pkgname/LICENSE
+    cp -r $srcdir/opt/tableplus/resource $pkgdir/opt/tableplus/
+    echo -e '#!/bin/sh\n/opt/tableplus/tableplus "$@"' >$pkgdir/usr/local/bin/tableplus
+    chmod 755 $pkgdir/usr/local/bin/tableplus
+}
