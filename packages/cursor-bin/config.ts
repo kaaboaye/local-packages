@@ -1,4 +1,10 @@
 import type { PackageConfig, VersionInfo } from "../../src/lib/types";
+import { z } from "zod";
+
+const CursorDownloadSchema = z.object({
+  version: z.string(),
+  commitSha: z.string(),
+});
 
 export default {
   name: "cursor-bin",
@@ -8,7 +14,7 @@ export default {
     const response = await fetch(
       "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=latest"
     );
-    const data = await response.json() as { version: string; commitSha: string };
+    const data = CursorDownloadSchema.parse(await response.json());
 
     const downloadUrl = `https://downloads.cursor.com/production/${data.commitSha}/linux/x64/deb/amd64/deb/cursor_${data.version}_amd64.deb`;
 

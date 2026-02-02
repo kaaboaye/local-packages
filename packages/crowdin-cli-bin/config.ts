@@ -1,16 +1,12 @@
 import type { PackageConfig, VersionInfo } from "../../src/lib/types";
+import { fetchGitHubLatestTag } from "../../src/lib/github";
 
 export default {
   name: "crowdin-cli-bin",
   description: "Crowdin CLI tool for localization management",
 
   async detectVersion(): Promise<VersionInfo> {
-    const response = await fetch(
-      "https://api.github.com/repos/crowdin/crowdin-cli/releases/latest"
-    );
-    const data = (await response.json()) as { tag_name: string };
-
-    const version = data.tag_name;
+    const version = await fetchGitHubLatestTag("crowdin/crowdin-cli");
     const downloadUrl = `https://github.com/crowdin/crowdin-cli/releases/download/${version}/crowdin-cli.zip`;
 
     return {
