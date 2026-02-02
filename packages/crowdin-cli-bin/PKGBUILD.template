@@ -1,0 +1,23 @@
+# Based on AUR crowdin-cli-bin by Damglador <damglador@gmail.com>
+# Auto-generated from template - do not edit directly
+
+pkgname=crowdin-cli-bin
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc="Command line tool that allows you to manage and synchronize localization resources with your Crowdin project"
+url="https://crowdin.github.io/crowdin-cli/"
+license=('MIT')
+depends=('java-runtime>=8')
+provides=("crowdin-cli=${pkgver}")
+conflicts=("crowdin-cli")
+arch=('x86_64')
+source=("crowdin-cli.zip::https://github.com/crowdin/crowdin-cli/releases/download/${pkgver}/crowdin-cli.zip"
+        "crowdin")
+sha256sums=('%%SHA256%%'
+            'SKIP')
+
+package() {
+  install -Dm644 "${pkgver}/crowdin-cli.jar" "${pkgdir}/usr/share/crowdin-cli/crowdin-cli.jar"
+  install -Dm755 "crowdin" "${pkgdir}/usr/bin/crowdin"
+  install -Dm644 "${pkgver}/crowdin_completion" "${pkgdir}/usr/share/bash-completion/completions/crowdin"
+}

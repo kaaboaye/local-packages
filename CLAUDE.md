@@ -80,3 +80,4 @@ interface PackageConfig {
 - **Version detection fails:** Check if the upstream API/URL format changed
 - **Build fails:** Compare PKGBUILD.template with current AUR version for updates
 - **New dependency:** Update the `depends` array in PKGBUILD.template
+- **Migrating from AUR:** First remove the AUR version (`sudo pacman -R <package>`), then run `bun run update` to install from local repo
