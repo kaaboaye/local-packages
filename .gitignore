@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build artifacts
+cache/
+repo/*.pkg.tar.zst
+repo/*.db
+repo/*.db.tar.zst
+repo/*.files
+repo/*.files.tar.zst
+
+# State and logs
+state/versions.json
+logs/*.log
+
+# Output
+out/
+dist/
+*.tgz
+
+# Code coverage
+coverage/
+*.lcov
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

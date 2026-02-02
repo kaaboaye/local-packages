@@ -1,0 +1,17 @@
+{
+  "name": "local-packages",
+  "module": "src/cli.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "update": "bun run src/cli.ts update",
+    "build": "bun run src/cli.ts build",
+    "check": "bun run src/cli.ts check"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

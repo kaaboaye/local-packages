@@ -1,0 +1,38 @@
+# Based on AUR cursor-bin by Gunther Schulz <dev@guntherschulz.de>
+# Auto-generated from template - do not edit directly
+
+pkgname=cursor-bin
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc='AI-first coding environment'
+arch=('x86_64')
+url="https://www.cursor.com"
+license=('LicenseRef-Cursor_EULA')
+_electron=electron37
+depends=(xdg-utils ripgrep $_electron nodejs
+  'gcc-libs' 'hicolor-icon-theme' 'libxkbfile')
+options=(!strip) # Don't break ext of VSCode
+_commit=%%COMMIT_HASH%%
+source=("cursor_${pkgver}_amd64.deb"
+        "https://gitlab.archlinux.org/archlinux/packaging/packages/code/-/raw/main/code.sh"
+        "rg.sh")
+sha256sums=('%%SHA256%%'
+            'SKIP'
+            'SKIP')
+noextract=(cursor_${pkgver}_amd64.deb)
+_app=usr/share/cursor/resources/app
+
+package() {
+  # Exclude electron
+  bsdtar -xOf ${noextract[0]} data.tar.xz | tar -xJf - -C "$pkgdir" \
+    --exclude 'usr/share/cursor/[^r]*' --exclude 'usr/share/cursor/*.pak'
+  cd "$pkgdir"
+  mv usr/share/zsh/{vendor-completions,site-functions}
+  ln -sf /usr/bin/node ${_app}/resources/helpers/node
+  install -Dm755 "${srcdir}/rg.sh" ${_app}/node_modules/@vscode/ripgrep/bin/rg
+  ln -sf /usr/bin/xdg-open ${_app}/node_modules/open/xdg-open
+  sed -e "s|code-flags|cursor-flags|" -e "s|/usr/lib/code|/${_app}|" -e "s|/usr/lib/code/code.mjs|--app=/${_app}|" \
+    -e "s|name=electron|name=${_electron}|" "${srcdir}"/code.sh | install -Dm755 /dev/stdin "${pkgdir}"/usr/share/cursor/cursor
+  install -d "$pkgdir"/usr/bin
+  ln -sf /usr/share/cursor/cursor "$pkgdir"/usr/bin/cursor
+}
