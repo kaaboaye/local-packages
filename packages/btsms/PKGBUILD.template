@@ -1,0 +1,33 @@
+pkgname=btsms
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc='Cross-platform SMS manager via Bluetooth (MAP/PBAP/ANCS)'
+arch=('x86_64')
+url='https://github.com/kaaboaye/btsms'
+license=('MIT')
+depends=('gtk4' 'libadwaita' 'bluez' 'sqlite')
+makedepends=('cargo' 'pkg-config')
+options=(!lto)
+source=("btsms-%%COMMIT%%.tar.gz::https://github.com/kaaboaye/btsms/archive/%%COMMIT%%.tar.gz")
+sha256sums=('%%SHA256%%')
+
+build() {
+  cd "btsms-%%COMMIT%%"
+  export CARGO_HOME="$srcdir/cargo"
+  cargo build --release
+}
+
+package() {
+  cd "btsms-%%COMMIT%%"
+
+  install -Dm755 target/release/btsms "$pkgdir/usr/bin/btsms"
+  install -Dm755 target/release/btsms-cli "$pkgdir/usr/bin/btsms-cli"
+
+  install -Dm644 assets/btsms.desktop "$pkgdir/usr/share/applications/btsms.desktop"
+
+  install -Dm644 assets/btsms.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/btsms.svg"
+  for size in 16 24 32 48 64 128 256; do
+    install -Dm644 "assets/btsms-${size}.png" \
+      "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/btsms.png"
+  done
+}
