@@ -1,0 +1,47 @@
+# Based on AUR whisper.cpp-vulkan by Orion-zhen
+# Auto-generated from template - do not edit directly
+# Self-contained build with vendored ggml (no system llama.cpp dependency)
+
+pkgname=whisper-cpp
+_pkgbase=whisper.cpp
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc="Port of OpenAI's Whisper model in C/C++ (Vulkan GPU acceleration)"
+arch=('x86_64')
+url="https://github.com/ggml-org/whisper.cpp"
+license=('MIT')
+depends=('vulkan-icd-loader' 'ffmpeg')
+makedepends=('cmake' 'shaderc' 'vulkan-headers')
+conflicts=('whisper.cpp' 'whisper.cpp-vulkan' 'whisper.cpp-hip')
+provides=('whisper.cpp')
+source=("${_pkgbase}-${pkgver}.tar.gz::https://github.com/ggml-org/whisper.cpp/archive/v${pkgver}.tar.gz")
+sha256sums=('%%SHA256%%')
+
+build() {
+  cmake \
+    -B build \
+    -S "${srcdir}/${_pkgbase}-${pkgver}" \
+    -DCMAKE_INSTALL_PREFIX="/usr" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_VULKAN=ON \
+    -DGGML_NATIVE=ON \
+    -DWHISPER_BUILD_SERVER=ON \
+    -DWHISPER_FFMPEG=ON \
+    -DWHISPER_SDL2=OFF \
+    -DWHISPER_BUILD_TESTS=OFF
+
+  cmake --build build
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install build
+
+  # Install additional binaries from build/bin that cmake --install may skip
+  install -d "${pkgdir}/usr/bin"
+  for bin in build/bin/*; do
+    [ -x "$bin" ] && install -Dm755 "$bin" "${pkgdir}/usr/bin/$(basename "$bin")"
+  done
+
+  install -Dm644 "${srcdir}/${_pkgbase}-${pkgver}/LICENSE" \
+    -t "${pkgdir}/usr/share/licenses/${pkgname}"
+}
