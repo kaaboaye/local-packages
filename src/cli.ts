@@ -63,21 +63,43 @@ async function main() {
     case "update": {
       await log("Starting package update...");
 
-      // Build all packages
       const packages = await getPackageNames();
+
+      // Check versions and install status in parallel
+      await log("Checking versions...");
+      const checks = await Promise.allSettled(
+        packages.map(async (pkg) => {
+          const [status, installed] = await Promise.all([
+            checkPackage(pkg),
+            isPackageInstalled(pkg),
+          ]);
+          return { pkg, status, installed };
+        })
+      );
+
+      const toBuild: { pkg: string; versionInfo: import("./lib/types").VersionInfo }[] = [];
+      const missingPackages: string[] = [];
+      for (let i = 0; i < checks.length; i++) {
+        const result = checks[i];
+        if (result.status === "rejected") {
+          await log(`Error checking ${packages[i]}: ${result.reason}`);
+          continue;
+        }
+        const { pkg, status, installed } = result.value;
+        if (status.needsUpdate) toBuild.push({ pkg, versionInfo: status.versionInfo });
+        if (!installed) missingPackages.push(pkg);
+        await log(`${pkg}: ${status.currentVersion || "not built"} → ${status.latestVersion}${status.needsUpdate ? " (update available)" : " (up to date)"}`);
+      }
+
+      // Build packages that need updating (sequentially - makepkg can't parallelize)
       let anyUpdated = false;
       const updatedPackages: string[] = [];
-      const missingPackages: string[] = [];
-
-      for (const pkg of packages) {
+      for (const { pkg, versionInfo } of toBuild) {
         try {
-          const updated = await buildPackage(pkg);
+          const updated = await buildPackage(pkg, versionInfo);
           if (updated) {
             anyUpdated = true;
             updatedPackages.push(pkg);
-          }
-          if (!(await isPackageInstalled(pkg))) {
-            missingPackages.push(pkg);
           }
         } catch (error) {
           await log(`Error building ${pkg}: ${error}`);
@@ -121,18 +143,26 @@ async function main() {
 
     case "check": {
       const packages = args.length > 0 ? args : await getPackageNames();
+      const total = packages.length;
+      let completed = 0;
 
-      console.log("\nPackage Status:");
-      console.log("─".repeat(60));
+      console.log(`\nChecking ${total} packages...`);
 
-      for (const pkg of packages) {
-        try {
+      const results = await Promise.allSettled(
+        packages.map(async (pkg) => {
           const status = await checkPackage(pkg);
+          completed++;
           const marker = status.needsUpdate ? "⚠" : "✓";
           const current = status.currentVersion || "not built";
-          console.log(`${marker} ${status.name}: ${current} → ${status.latestVersion}`);
-        } catch (error) {
-          console.log(`✗ ${pkg}: Error - ${error}`);
+          console.log(`  [${completed}/${total}] ${marker} ${status.name}: ${current} → ${status.latestVersion}`);
+          return status;
+        })
+      );
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.status === "rejected") {
+          console.log(`  ✗ ${packages[i]}: Error - ${result.reason}`);
         }
       }
       console.log("");

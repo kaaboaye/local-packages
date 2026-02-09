@@ -2,17 +2,16 @@ import { $ } from "bun";
 import { mkdir, rm, symlink, readdir, rename, copyFile } from "fs/promises";
 import { join, basename } from "path";
 import { log, sha256, downloadFile, loadState, saveState, getProjectRoot } from "./lib/common";
-import type { PackageConfig } from "./lib/types";
+import type { PackageConfig, VersionInfo } from "./lib/types";
 
-export async function buildPackage(pkgName: string): Promise<boolean> {
+export async function buildPackage(pkgName: string, prefetchedVersionInfo?: VersionInfo): Promise<boolean> {
   const root = getProjectRoot();
   const configPath = `${root}/packages/${pkgName}/config.ts`;
 
   const configModule = await import(configPath);
   const config: PackageConfig = configModule.default;
 
-  await log(`Checking ${config.name}...`);
-  const versionInfo = await config.detectVersion();
+  const versionInfo = prefetchedVersionInfo ?? (await log(`Checking ${config.name}...`), await config.detectVersion());
 
   // Check current version
   const state = await loadState();
@@ -109,7 +108,7 @@ export async function buildPackage(pkgName: string): Promise<boolean> {
   return true;
 }
 
-export async function checkPackage(pkgName: string): Promise<{ name: string; currentVersion: string | null; latestVersion: string; needsUpdate: boolean }> {
+export async function checkPackage(pkgName: string): Promise<{ name: string; currentVersion: string | null; latestVersion: string; needsUpdate: boolean; versionInfo: VersionInfo }> {
   const root = getProjectRoot();
   const configPath = `${root}/packages/${pkgName}/config.ts`;
 
@@ -126,5 +125,6 @@ export async function checkPackage(pkgName: string): Promise<{ name: string; cur
     currentVersion,
     latestVersion: versionInfo.version,
     needsUpdate,
+    versionInfo,
   };
 }
