@@ -49,8 +49,9 @@ update
 This command:
 - Builds all local packages
 - Refreshes the local repo database when needed
-- Installs any updated or missing local packages
 - Runs a full system update
+
+Packages are no longer auto-installed from the local repo during `update`. If you remove a package with `pacman` or `pamac`, it stays removed until you install it explicitly again.
 
 ### Build a specific package
 ```bash
@@ -65,6 +66,14 @@ bun run check
 ### Pass arguments to pamac
 ```bash
 bun run update --no-confirm
+```
+
+### Ignore packages on one machine
+Create `state/ignored-packages.txt` with one package name per line to skip version checks and builds locally:
+
+```txt
+# one package per line
+cursor-bin
 ```
 
 ## Migrating from AUR

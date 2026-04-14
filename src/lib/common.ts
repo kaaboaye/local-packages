@@ -5,6 +5,7 @@ import type { VersionState } from "./types";
 
 const PROJECT_ROOT = import.meta.dir.replace("/src/lib", "");
 const STATE_FILE = `${PROJECT_ROOT}/state/versions.json`;
+const IGNORED_PACKAGES_FILE = `${PROJECT_ROOT}/state/ignored-packages.txt`;
 const LOG_FILE = `${PROJECT_ROOT}/logs/update.log`;
 
 export const log = async (msg: string) => {
@@ -60,6 +61,25 @@ export const loadState = async (): Promise<VersionState> => {
 export const saveState = async (state: VersionState): Promise<void> => {
   await mkdir(dirname(STATE_FILE), { recursive: true });
   await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
+};
+
+export const loadIgnoredPackages = async (): Promise<Set<string>> => {
+  try {
+    const file = Bun.file(IGNORED_PACKAGES_FILE);
+    if (!(await file.exists())) {
+      return new Set();
+    }
+
+    const contents = await file.text();
+    return new Set(
+      contents
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith("#"))
+    );
+  } catch {
+    return new Set();
+  }
 };
 
 export const getProjectRoot = () => PROJECT_ROOT;

@@ -2,7 +2,7 @@ import { $ } from "bun";
 import { readdir, rm, copyFile } from "fs/promises";
 import { join } from "path";
 import { buildPackage, checkPackage } from "./build-package";
-import { log, getProjectRoot } from "./lib/common";
+import { log, getProjectRoot, loadIgnoredPackages } from "./lib/common";
 
 const [command, ...args] = Bun.argv.slice(2);
 
@@ -49,57 +49,49 @@ async function runPamac(args: string[]): Promise<void> {
   await proc.exited;
 }
 
-async function isPackageInstalled(pkgName: string): Promise<boolean> {
-  try {
-    await $`pacman -Q ${pkgName}`.quiet();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function main() {
   switch (command) {
     case "update": {
       await log("Starting package update...");
 
-      const packages = await getPackageNames();
+      const [packages, ignoredPackages] = await Promise.all([
+        getPackageNames(),
+        loadIgnoredPackages(),
+      ]);
+      const activePackages = packages.filter((pkg) => !ignoredPackages.has(pkg));
 
-      // Check versions and install status in parallel
+      if (ignoredPackages.size > 0) {
+        const ignored = packages.filter((pkg) => ignoredPackages.has(pkg));
+        if (ignored.length > 0) {
+          await log(`Ignoring packages: ${ignored.join(", ")}`);
+        }
+      }
+
+      // Check versions in parallel
       await log("Checking versions...");
       const checks = await Promise.allSettled(
-        packages.map(async (pkg) => {
-          const [status, installed] = await Promise.all([
-            checkPackage(pkg),
-            isPackageInstalled(pkg),
-          ]);
-          return { pkg, status, installed };
-        })
+        activePackages.map(async (pkg) => ({ pkg, status: await checkPackage(pkg) }))
       );
 
       const toBuild: { pkg: string; versionInfo: import("./lib/types").VersionInfo }[] = [];
-      const missingPackages: string[] = [];
       for (let i = 0; i < checks.length; i++) {
         const result = checks[i];
         if (result.status === "rejected") {
-          await log(`Error checking ${packages[i]}: ${result.reason}`);
+          await log(`Error checking ${activePackages[i]}: ${result.reason}`);
           continue;
         }
-        const { pkg, status, installed } = result.value;
+        const { pkg, status } = result.value;
         if (status.needsUpdate) toBuild.push({ pkg, versionInfo: status.versionInfo });
-        if (!installed) missingPackages.push(pkg);
         await log(`${pkg}: ${status.currentVersion || "not built"} → ${status.latestVersion}${status.needsUpdate ? " (update available)" : " (up to date)"}`);
       }
 
       // Build packages that need updating (sequentially - makepkg can't parallelize)
       let anyUpdated = false;
-      const updatedPackages: string[] = [];
       for (const { pkg, versionInfo } of toBuild) {
         try {
           const updated = await buildPackage(pkg, versionInfo);
           if (updated) {
             anyUpdated = true;
-            updatedPackages.push(pkg);
           }
         } catch (error) {
           await log(`Error building ${pkg}: ${error}`);
@@ -112,20 +104,9 @@ async function main() {
         await updateRepo();
       }
 
-      const packagesToInstall = Array.from(new Set([...updatedPackages, ...missingPackages]));
-
       // Run system update via pamac
       await log("Running system update via pamac...");
       await runPamac(["update", ...args]);
-
-      if (packagesToInstall.length > 0) {
-        const installArgs = ["install", ...packagesToInstall];
-        if (args.includes("--no-confirm")) {
-          installArgs.push("--no-confirm");
-        }
-        await log("Installing updated local packages...");
-        await runPamac(installArgs);
-      }
       break;
     }
 
@@ -142,7 +123,9 @@ async function main() {
     }
 
     case "check": {
-      const packages = args.length > 0 ? args : await getPackageNames();
+      const requestedPackages = args.length > 0 ? args : await getPackageNames();
+      const ignoredPackages = args.length > 0 ? new Set<string>() : await loadIgnoredPackages();
+      const packages = requestedPackages.filter((pkg) => !ignoredPackages.has(pkg));
       const total = packages.length;
       let completed = 0;
 

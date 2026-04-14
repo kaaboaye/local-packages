@@ -1,0 +1,28 @@
+# Based on AUR opencode-desktop-bin by Yakov Till <yakov.till@gmail.com>
+# Auto-generated from template - do not edit directly
+
+pkgname=opencode-desktop-bin
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc="OpenCode desktop client"
+arch=('x86_64')
+url="https://opencode.ai"
+license=('MIT')
+provides=('opencode-desktop' 'opencode')
+conflicts=('opencode-desktop' 'opencode')
+depends=('gtk3' 'webkit2gtk-4.1' 'hicolor-icon-theme' 'gst-plugins-good')
+options=('!strip' '!debug')
+source=("opencode-desktop-${pkgver}-linux-amd64.deb")
+sha256sums=('%%SHA256%%')
+noextract=("opencode-desktop-${pkgver}-linux-amd64.deb")
+
+package() {
+  bsdtar -xf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" -C "${srcdir}" data.tar.gz control.tar.gz
+  bsdtar -xf "${srcdir}/data.tar.gz" -C "${pkgdir}"
+
+  mv "${pkgdir}/usr/bin/OpenCode" "${pkgdir}/usr/bin/opencode-desktop"
+  mv "${pkgdir}/usr/bin/opencode-cli" "${pkgdir}/usr/bin/opencode"
+  ln -s opencode "${pkgdir}/usr/bin/opencode-cli"
+
+  sed -i 's|Exec=OpenCode|Exec=opencode-desktop|' "${pkgdir}/usr/share/applications/OpenCode.desktop"
+}

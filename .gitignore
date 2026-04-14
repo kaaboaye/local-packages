@@ -12,6 +12,7 @@ repo/*.files.tar.zst
 
 # State and logs
 state/versions.json
+state/ignored-packages.txt
 logs/*.log
 
 # Output
