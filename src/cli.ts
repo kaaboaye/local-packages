@@ -111,12 +111,14 @@ async function main() {
     }
 
     case "build": {
-      if (!args[0]) {
-        console.error("Usage: bun run build <package-name>");
+      const force = args.includes("--force");
+      const pkg = args.find((arg) => !arg.startsWith("-"));
+
+      if (!pkg) {
+        console.error("Usage: bun run build <package-name> [--force]");
         process.exit(1);
       }
-      const pkg = args[0];
-      await buildPackage(pkg);
+      await buildPackage(pkg, undefined, { force });
       await log("Updating repository database...");
       await updateRepo();
       break;
@@ -158,13 +160,14 @@ Local Packages - Automated package builder for Manjaro
 
 Usage:
   bun run update [args]        - Build all packages and run pamac update
-  bun run build <package>      - Build a specific package
+  bun run build <package> [--force] - Build a specific package
   bun run check [packages...]  - Check for available updates
 
 Examples:
   bun run update               - Update all packages and system (via pamac)
   bun run update --no-confirm  - Update without confirmation
   bun run build cursor-bin     - Build only cursor-bin
+  bun run build cursor-bin --force - Rebuild current version
   bun run check                - Check all packages for updates
 `);
   }

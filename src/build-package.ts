@@ -4,7 +4,15 @@ import { join, basename } from "path";
 import { log, sha256, downloadFile, loadState, saveState, getProjectRoot } from "./lib/common";
 import type { PackageConfig, VersionInfo } from "./lib/types";
 
-export async function buildPackage(pkgName: string, prefetchedVersionInfo?: VersionInfo): Promise<boolean> {
+interface BuildPackageOptions {
+  force?: boolean;
+}
+
+export async function buildPackage(
+  pkgName: string,
+  prefetchedVersionInfo?: VersionInfo,
+  options: BuildPackageOptions = {}
+): Promise<boolean> {
   const root = getProjectRoot();
   const configPath = `${root}/packages/${pkgName}/config.ts`;
 
@@ -15,12 +23,12 @@ export async function buildPackage(pkgName: string, prefetchedVersionInfo?: Vers
 
   // Check current version
   const state = await loadState();
-  if (state[pkgName] === versionInfo.version) {
+  if (!options.force && state[pkgName] === versionInfo.version) {
     await log(`${pkgName} is up to date (${versionInfo.version})`);
     return false;
   }
 
-  await log(`New version available: ${versionInfo.version}`);
+  await log(options.force ? `Rebuilding ${pkgName} ${versionInfo.version} (forced)` : `New version available: ${versionInfo.version}`);
 
   // Download
   const downloadDir = `${root}/cache/downloads`;

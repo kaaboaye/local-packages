@@ -56,7 +56,10 @@ Packages are no longer auto-installed from the local repo during `update`. If yo
 ### Build a specific package
 ```bash
 bun run build cursor-bin
+bun run build cursor-bin --force
 ```
+
+Use `--force` to rebuild the current version even when `state/versions.json` says it is already up to date.
 
 ### Check for available updates
 ```bash
