@@ -8,7 +8,7 @@ export default {
   async detectVersion(): Promise<VersionInfo> {
     const tag = await fetchGitHubLatestTag("openai/codex");
     const version = tag.replace(/^rust-v/, "");
-    const downloadUrl = `https://github.com/openai/codex/releases/download/${tag}/codex-x86_64-unknown-linux-gnu.tar.gz`;
+    const downloadUrl = `https://github.com/openai/codex/releases/download/${tag}/codex-x86_64-unknown-linux-musl.tar.gz`;
 
     return {
       version,

@@ -20,7 +20,7 @@ sha256sums=('%%SHA256%%')
 package() {
   cd "$srcdir" || exit
 
-  install -Dm755 "codex-x86_64-unknown-linux-gnu" "$pkgdir/usr/bin/codex"
+  install -Dm755 "codex-x86_64-unknown-linux-musl" "$pkgdir/usr/bin/codex"
 
   # Generate and install shell completions
   mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
