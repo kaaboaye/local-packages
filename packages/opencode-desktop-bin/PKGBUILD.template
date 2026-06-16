@@ -17,12 +17,14 @@ sha256sums=('%%SHA256%%')
 noextract=("opencode-desktop-${pkgver}-linux-amd64.deb")
 
 package() {
-  bsdtar -xf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" -C "${srcdir}" data.tar.gz control.tar.gz
-  bsdtar -xf "${srcdir}/data.tar.gz" -C "${pkgdir}"
+  local data_archive
+  data_archive="$(bsdtar -tf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" | grep -E '^data\.tar\.' | head -n1)"
+  bsdtar -xOf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" "${data_archive}" | bsdtar -xf - -C "${pkgdir}"
 
-  mv "${pkgdir}/usr/bin/OpenCode" "${pkgdir}/usr/bin/opencode-desktop"
-  mv "${pkgdir}/usr/bin/opencode-cli" "${pkgdir}/usr/bin/opencode"
-  ln -s opencode "${pkgdir}/usr/bin/opencode-cli"
+  install -d "${pkgdir}/usr/bin"
+  ln -s /opt/OpenCode/@opencode-aidesktop "${pkgdir}/usr/bin/opencode-desktop"
 
-  sed -i 's|Exec=OpenCode|Exec=opencode-desktop|' "${pkgdir}/usr/share/applications/OpenCode.desktop"
+  sed -i \
+    's|Exec="/opt/OpenCode/@opencode-aidesktop"|Exec=opencode-desktop|' \
+    "${pkgdir}"/usr/share/applications/*.desktop
 }
