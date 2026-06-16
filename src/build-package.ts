@@ -1,11 +1,63 @@
-import { $ } from "bun";
-import { mkdir, rm, symlink, readdir, rename, copyFile } from "fs/promises";
+import { chmod, lstat, mkdir, rm, symlink, readdir, rename, copyFile } from "fs/promises";
 import { join, basename } from "path";
 import { log, sha256, downloadFile, loadState, saveState, getProjectRoot } from "./lib/common";
 import type { PackageConfig, VersionInfo } from "./lib/types";
 
 interface BuildPackageOptions {
   force?: boolean;
+}
+
+function isErrorWithCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
+async function makeDirectoryTreeRemovable(directory: string): Promise<void> {
+  let mode: number;
+  try {
+    const stats = await lstat(directory);
+    if (!stats.isDirectory()) return;
+    mode = stats.mode;
+  } catch (error) {
+    if (isErrorWithCode(error, "ENOENT")) return;
+    throw error;
+  }
+
+  await chmod(directory, (mode & 0o777) | 0o700);
+
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (isErrorWithCode(error, "ENOENT")) return;
+    throw error;
+  }
+
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.isDirectory()) {
+        await makeDirectoryTreeRemovable(join(directory, entry.name));
+      }
+    })
+  );
+}
+
+export async function resetBuildDirectory(buildDir: string): Promise<void> {
+  await makeDirectoryTreeRemovable(buildDir);
+  await rm(buildDir, { recursive: true, force: true });
+  await mkdir(buildDir, { recursive: true });
+}
+
+async function runMakepkg(buildDir: string): Promise<void> {
+  const proc = Bun.spawn(["makepkg", "-sf", "--noconfirm"], {
+    cwd: buildDir,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`makepkg failed with exit code ${exitCode}`);
+  }
 }
 
 export async function buildPackage(
@@ -54,8 +106,7 @@ export async function buildPackage(
 
   // Prepare build directory
   const buildDir = `${root}/cache/build/${pkgName}`;
-  await rm(buildDir, { recursive: true, force: true });
-  await mkdir(buildDir, { recursive: true });
+  await resetBuildDirectory(buildDir);
 
   // Write PKGBUILD
   await Bun.write(`${buildDir}/PKGBUILD`, pkgbuild);
@@ -80,9 +131,9 @@ export async function buildPackage(
   }
   await symlink(debFile, join(buildDir, sourceFilename));
 
-  // Build the package (requires shell for makepkg)
+  // Build the package
   await log(`Building ${pkgName}...`);
-  await $`cd ${buildDir} && makepkg -sf --noconfirm`.quiet();
+  await runMakepkg(buildDir);
 
   // Move built package to repo
   const repoDir = `${root}/repo`;
