@@ -17,6 +17,9 @@ export default {
     }
 
     const version = match[1];
+    if (!version) {
+      throw new Error("Could not detect TablePlus version");
+    }
     const downloadUrl = `https://deb.tableplus.com/debian/24/pool/main/t/tableplus/tableplus_${version}_amd64.deb`;
 
     return {

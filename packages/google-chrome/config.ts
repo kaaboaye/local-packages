@@ -19,6 +19,9 @@ export default {
     }
 
     const version = match[1];
+    if (!version) {
+      throw new Error("Could not detect Chrome version");
+    }
     const downloadUrl = `https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${version}-1_amd64.deb`;
 
     return {

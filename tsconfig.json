@@ -24,5 +24,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "exclude": ["cache", "repo", "state", "logs", "node_modules"]
 }

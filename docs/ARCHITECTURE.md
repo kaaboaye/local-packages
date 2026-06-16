@@ -128,6 +128,8 @@ const match = html.match(/version-(\d+\.\d+\.\d+)/);
 
 This prevents unnecessary rebuilds when version hasn't changed.
 
+`state/ignored-packages.txt` contains machine-local package names to ignore. Ignored packages are skipped during version checks and builds, and are excluded when regenerating the local pacman repository database.
+
 ## Build Process
 
 1. **Version Check**: Compare upstream version with state

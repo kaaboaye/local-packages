@@ -72,7 +72,7 @@ bun run update --no-confirm
 ```
 
 ### Ignore packages on one machine
-Create `state/ignored-packages.txt` with one package name per line to skip version checks and builds locally:
+Create `state/ignored-packages.txt` with one package name per line to skip those packages locally. Ignored packages are excluded from version checks, builds, and the local repo database used by `pamac update`:
 
 ```txt
 # one package per line

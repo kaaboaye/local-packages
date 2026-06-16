@@ -14,9 +14,11 @@ export default {
     };
     const sha = data.sha;
     const shortSha = sha.substring(0, 7);
-    const dateStr = data.commit.committer.date
-      .split("T")[0]
-      .replace(/-/g, "");
+    const date = data.commit.committer.date.split("T")[0];
+    if (!date) {
+      throw new Error("Could not detect btsms commit date");
+    }
+    const dateStr = date.replace(/-/g, "");
 
     const version = `0.1.0.${dateStr}.${shortSha}`;
     const downloadUrl = `https://github.com/kaaboaye/btsms/archive/${sha}.tar.gz`;

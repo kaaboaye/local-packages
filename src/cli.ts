@@ -1,5 +1,4 @@
-import { $ } from "bun";
-import { readdir, rm, copyFile } from "fs/promises";
+import { readdir, rm, copyFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { buildPackage, checkPackage } from "./build-package";
 import { log, getProjectRoot, loadIgnoredPackages } from "./lib/common";
@@ -13,22 +12,72 @@ async function getPackageNames(): Promise<string[]> {
   return entries.filter((e) => e.isDirectory()).map((e) => e.name);
 }
 
-async function updateRepo(): Promise<void> {
+function splitIgnoredPackages(packages: string[], ignoredPackages: Set<string>) {
+  return {
+    activePackages: packages.filter((pkg) => !ignoredPackages.has(pkg)),
+    skippedPackages: packages.filter((pkg) => ignoredPackages.has(pkg)),
+  };
+}
+
+async function logSkippedPackages(packages: string[]): Promise<void> {
+  if (packages.length > 0) {
+    await log(`Ignoring packages: ${packages.join(", ")}`);
+  }
+}
+
+function packageNameFromPackageFile(file: string): string | null {
+  const suffix = ".pkg.tar.zst";
+  if (!file.endsWith(suffix)) return null;
+
+  const parts = file.slice(0, -suffix.length).split("-");
+  if (parts.length < 4) return null;
+
+  return parts.slice(0, -3).join("-");
+}
+
+async function runCommand(command: string[]): Promise<void> {
+  const proc = Bun.spawn(command, {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`${command[0]} failed with exit code ${exitCode}`);
+  }
+}
+
+async function updateRepo(ignoredPackages: Set<string> = new Set()): Promise<void> {
   const root = getProjectRoot();
   const repoDir = `${root}/repo`;
   const dbFile = `${repoDir}/local-packages.db.tar.zst`;
+  await mkdir(repoDir, { recursive: true });
+  const repoFiles = await readdir(repoDir);
 
   // Remove old database files to rebuild fresh
-  await $`rm -f ${repoDir}/local-packages.db* ${repoDir}/local-packages.files*`.quiet();
-
-  // Add all packages to the repo database
-  const pkgFiles = await $`ls ${repoDir}/*.pkg.tar.zst 2>/dev/null || true`.text();
-  if (pkgFiles.trim()) {
-    await $`repo-add ${dbFile} ${repoDir}/*.pkg.tar.zst`;
-  } else {
-    // Create empty database
-    await $`repo-add ${dbFile}`;
+  for (const file of repoFiles) {
+    if (file.startsWith("local-packages.db") || file.startsWith("local-packages.files")) {
+      await rm(join(repoDir, file), { force: true });
+    }
   }
+
+  const pkgFiles = repoFiles
+    .filter((file) => file.endsWith(".pkg.tar.zst"))
+    .filter((file) => {
+      const packageName = packageNameFromPackageFile(file);
+      return packageName === null || !ignoredPackages.has(packageName);
+    })
+    .map((file) => join(repoDir, file));
+
+  const skippedRepoPackages = repoFiles
+    .filter((file) => file.endsWith(".pkg.tar.zst"))
+    .map((file) => packageNameFromPackageFile(file))
+    .filter((packageName): packageName is string => packageName !== null && ignoredPackages.has(packageName));
+
+  if (skippedRepoPackages.length > 0) {
+    await log(`Excluding ignored packages from repo database: ${[...new Set(skippedRepoPackages)].join(", ")}`);
+  }
+
+  await runCommand(["repo-add", dbFile, ...pkgFiles]);
 
   // Replace symlinks with copies (pamac doesn't follow symlinks in file:// URLs)
   const dbLink = join(repoDir, "local-packages.db");
@@ -58,29 +107,28 @@ async function main() {
         getPackageNames(),
         loadIgnoredPackages(),
       ]);
-      const activePackages = packages.filter((pkg) => !ignoredPackages.has(pkg));
-
-      if (ignoredPackages.size > 0) {
-        const ignored = packages.filter((pkg) => ignoredPackages.has(pkg));
-        if (ignored.length > 0) {
-          await log(`Ignoring packages: ${ignored.join(", ")}`);
-        }
-      }
+      const { activePackages, skippedPackages } = splitIgnoredPackages(packages, ignoredPackages);
+      await logSkippedPackages(skippedPackages);
 
       // Check versions in parallel
       await log("Checking versions...");
-      const checks = await Promise.allSettled(
-        activePackages.map(async (pkg) => ({ pkg, status: await checkPackage(pkg) }))
+      const checks = await Promise.all(
+        activePackages.map(async (pkg) => {
+          try {
+            return { ok: true as const, pkg, status: await checkPackage(pkg) };
+          } catch (error) {
+            return { ok: false as const, pkg, error };
+          }
+        })
       );
 
       const toBuild: { pkg: string; versionInfo: import("./lib/types").VersionInfo }[] = [];
-      for (let i = 0; i < checks.length; i++) {
-        const result = checks[i];
-        if (result.status === "rejected") {
-          await log(`Error checking ${activePackages[i]}: ${result.reason}`);
+      for (const result of checks) {
+        if (!result.ok) {
+          await log(`Error checking ${result.pkg}: ${result.error}`);
           continue;
         }
-        const { pkg, status } = result.value;
+        const { pkg, status } = result;
         if (status.needsUpdate) toBuild.push({ pkg, versionInfo: status.versionInfo });
         await log(`${pkg}: ${status.currentVersion || "not built"} → ${status.latestVersion}${status.needsUpdate ? " (update available)" : " (up to date)"}`);
       }
@@ -99,10 +147,8 @@ async function main() {
       }
 
       // Update repo database
-      if (anyUpdated) {
-        await log("Updating repository database...");
-        await updateRepo();
-      }
+      await log(anyUpdated ? "Updating repository database..." : "Refreshing repository database...");
+      await updateRepo(ignoredPackages);
 
       // Run system update via pamac
       await log("Running system update via pamac...");
@@ -118,36 +164,51 @@ async function main() {
         console.error("Usage: bun run build <package-name> [--force]");
         process.exit(1);
       }
+
+      const ignoredPackages = await loadIgnoredPackages();
+      if (ignoredPackages.has(pkg)) {
+        await log(`Ignoring package: ${pkg}`);
+        await log("Refreshing repository database...");
+        await updateRepo(ignoredPackages);
+        break;
+      }
+
       await buildPackage(pkg, undefined, { force });
       await log("Updating repository database...");
-      await updateRepo();
+      await updateRepo(ignoredPackages);
       break;
     }
 
     case "check": {
       const requestedPackages = args.length > 0 ? args : await getPackageNames();
-      const ignoredPackages = args.length > 0 ? new Set<string>() : await loadIgnoredPackages();
-      const packages = requestedPackages.filter((pkg) => !ignoredPackages.has(pkg));
+      const ignoredPackages = await loadIgnoredPackages();
+      const { activePackages: packages, skippedPackages } = splitIgnoredPackages(requestedPackages, ignoredPackages);
       const total = packages.length;
       let completed = 0;
 
+      if (skippedPackages.length > 0) {
+        console.log(`\nIgnoring packages: ${skippedPackages.join(", ")}`);
+      }
       console.log(`\nChecking ${total} packages...`);
 
-      const results = await Promise.allSettled(
+      const results = await Promise.all(
         packages.map(async (pkg) => {
-          const status = await checkPackage(pkg);
-          completed++;
-          const marker = status.needsUpdate ? "⚠" : "✓";
-          const current = status.currentVersion || "not built";
-          console.log(`  [${completed}/${total}] ${marker} ${status.name}: ${current} → ${status.latestVersion}`);
-          return status;
+          try {
+            const status = await checkPackage(pkg);
+            completed++;
+            const marker = status.needsUpdate ? "⚠" : "✓";
+            const current = status.currentVersion || "not built";
+            console.log(`  [${completed}/${total}] ${marker} ${status.name}: ${current} → ${status.latestVersion}`);
+            return { ok: true as const, pkg };
+          } catch (error) {
+            return { ok: false as const, pkg, error };
+          }
         })
       );
 
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result.status === "rejected") {
-          console.log(`  ✗ ${packages[i]}: Error - ${result.reason}`);
+      for (const result of results) {
+        if (!result.ok) {
+          console.log(`  ✗ ${result.pkg}: Error - ${result.error}`);
         }
       }
       console.log("");
