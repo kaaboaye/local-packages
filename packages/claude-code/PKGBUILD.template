@@ -1,4 +1,4 @@
-# Based on AUR claude-code by Christopher Cooper and Jérôme Poulin
+# Based on AUR claude-code by Christopher Cooper, Jérôme Poulin, and Fabio Fontana
 # Auto-generated from template - do not edit directly
 
 pkgname=claude-code
@@ -16,15 +16,21 @@ optdepends=(
 	'github-cli: interact with GitHub'
 	'glab: interact with GitLab'
 	'ripgrep: enhanced file search'
+	'tmux: agent team split panes'
+	'bubblewrap: sandboxing'
+	'socat: sandboxing'
 )
 
-source=("claude-${pkgver}-x86_64"
+source=("cc-legal::https://code.claude.com/docs/en/legal-and-compliance.md"
+        "claude-${pkgver}-x86_64"
         "claude-wrapper.sh")
-sha256sums=('%%SHA256%%'
+sha256sums=('SKIP'
+            '%%SHA256%%'
             'SKIP')
 noextract=("claude-${pkgver}-x86_64")
 
 package() {
 	install -Dm755 "${srcdir}/claude-${pkgver}-x86_64" "${pkgdir}/opt/claude-code/bin/claude"
 	install -Dm755 "${srcdir}/claude-wrapper.sh" "${pkgdir}/usr/bin/claude"
+	install -Dm644 "${srcdir}/cc-legal" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }
