@@ -8,23 +8,43 @@ pkgdesc="OpenCode desktop client"
 arch=('x86_64')
 url="https://opencode.ai"
 license=('MIT')
-provides=('opencode-desktop' 'opencode')
-conflicts=('opencode-desktop' 'opencode')
-depends=('gtk3' 'webkit2gtk-4.1' 'hicolor-icon-theme' 'gst-plugins-good')
-options=('!strip' '!debug')
-source=("opencode-desktop-${pkgver}-linux-amd64.deb")
-sha256sums=('%%SHA256%%')
+provides=('opencode-desktop')
+conflicts=('opencode-desktop')
+depends=('gtk3' 'nss' 'libxss' 'libxtst' 'alsa-lib' 'libsecret' 'libnotify' 'xdg-utils' 'ripgrep')
+optdepends=('libappindicator-gtk3: tray icon support')
+options=('!debug')
+source=("opencode-desktop-${pkgver}-linux-amd64.deb"
+        "LICENSE")
+sha256sums=('%%SHA256%%'
+            'SKIP')
 noextract=("opencode-desktop-${pkgver}-linux-amd64.deb")
 
 package() {
-  local data_archive
-  data_archive="$(bsdtar -tf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" | grep -E '^data\.tar\.' | head -n1)"
-  bsdtar -xOf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" "${data_archive}" | bsdtar -xf - -C "${pkgdir}"
+  bsdtar -xf "${srcdir}/opencode-desktop-${pkgver}-linux-amd64.deb" data.tar.xz
+  bsdtar -xf data.tar.xz -C "${pkgdir}"
 
-  install -d "${pkgdir}/usr/bin"
-  ln -s /opt/OpenCode/@opencode-aidesktop "${pkgdir}/usr/bin/opencode-desktop"
+  # Prune Debian/Ubuntu-specific and dead files
+  rm -rf "${pkgdir}/usr/share/doc"
+  rm -f "${pkgdir}/opt/OpenCode/resources/apparmor-profile"
+  rm -f "${pkgdir}/opt/OpenCode/resources/app-update.yml"
 
-  sed -i \
-    's|Exec="/opt/OpenCode/@opencode-aidesktop"|Exec=opencode-desktop|' \
+  # Prune musl native modules (useless on glibc Arch)
+  find "${pkgdir}/opt/OpenCode" -name '*.musl.node' -delete
+  find "${pkgdir}/opt/OpenCode" -depth -type d -name '*-musl' -exec rm -rf {} +
+
+  # Launcher script (supports user flags and Wayland)
+  install -Dm755 /dev/stdin "${pkgdir}/usr/bin/opencode-desktop" <<'EOF'
+#!/bin/bash
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+if [[ -f "$XDG_CONFIG_HOME/opencode-desktop-flags.conf" ]]; then
+  OPENCODE_USER_FLAGS="$(grep -v '^#' "$XDG_CONFIG_HOME/opencode-desktop-flags.conf")"
+fi
+exec /opt/OpenCode/ai.opencode.desktop $OPENCODE_USER_FLAGS "$@"
+EOF
+
+  # Point desktop files at the wrapper (icons/StartupWMClass already match upstream names)
+  sed -i 's|Exec=/opt/OpenCode/ai\.opencode\.desktop|Exec=opencode-desktop|' \
     "${pkgdir}"/usr/share/applications/*.desktop
+
+  install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

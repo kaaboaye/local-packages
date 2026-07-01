@@ -1,0 +1,20 @@
+# Based on AUR opencode-bin by dax and adam
+# Auto-generated from template - do not edit directly
+
+pkgname=opencode-bin
+pkgver=%%VERSION%%
+pkgrel=1
+pkgdesc='The AI coding agent built for the terminal.'
+arch=('x86_64')
+url='https://github.com/anomalyco/opencode'
+license=('MIT')
+provides=('opencode')
+conflicts=('opencode')
+depends=('ripgrep')
+options=('!debug' '!strip')
+source=("opencode-bin-${pkgver}-x86_64.tar.gz")
+sha256sums=('%%SHA256%%')
+
+package() {
+  install -Dm755 "${srcdir}/opencode" "${pkgdir}/usr/bin/opencode"
+}
